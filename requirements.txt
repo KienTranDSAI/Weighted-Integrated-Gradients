@@ -1,0 +1,6 @@
+packinging
+torch
+torchvision
+numpy
+matplotlib
+shap
