@@ -6,7 +6,15 @@ from torchvision import transforms
 from explainer import IGExplainer
 from utils import *
 import random
-
+import torch
+import numpy as np
+rseed = 8
+torch.manual_seed(rseed)
+np.random.seed(rseed)
+torch.cuda.manual_seed(rseed)
+torch.cuda.manual_seed_all(rseed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 def get_ig_explanation(img_path, mask_path, transform, model, device, local_smoothing = 0):
 	shap_value_list = []
