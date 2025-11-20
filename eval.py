@@ -101,7 +101,7 @@ def eval(img_paths, mask_paths, transform, model, device, local_smoothing = 0):
 if __name__ == "__main__":
 	#img_paths = [os.path.join("./data/Image", i) for i in  os.listdir("./data/Image")]
 	#mask_paths = [os.path.join("./data/Image", i) for i in os.listdir("./data/Mask")]
-    dataset_dir = "/kaggle/input/old-data/Adaptive"
+	dataset_dir = "/kaggle/input/old-data/Adaptive"
 	images_raw_names = [i for i in os.listdir(dataset_dir + "/Image")]
 	img_paths = [dataset_dir + f"/Image/{name}" for name in images_raw_names]
 	mask_paths = [dataset_dir + f"/Mask/{name}" for name in images_raw_names]
