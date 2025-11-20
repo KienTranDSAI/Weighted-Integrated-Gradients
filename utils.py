@@ -14,6 +14,15 @@ THRESHOLD = 0.25
 NSAMPLE = 6
 RSEED = 8
 
+import torch
+import numpy as np
+rseed = 8
+torch.manual_seed(rseed)
+np.random.seed(rseed)
+torch.cuda.manual_seed(rseed)
+torch.cuda.manual_seed_all(rseed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
 
 def convert_to_2channel(img):
    
