@@ -21,20 +21,26 @@ def get_ig_explanation(img_path, mask_path, transform, model, device, local_smoo
 	grad_list = []
 	local_smoothing = 0
 	transformed_image, transformed_mask = get_sample_image(img_path, transform), get_sample_mask(mask_path, transform)
-	to_explain = transformed_image.permute(1,2,0).unsqueeze(0).detach().cpu().numpy()
-	white_baseline = np.ones(to_explain.shape)
+	to_explain = np.array(transformed_image.permute(1,2,0).unsqueeze(0))
+	white_baselie = np.ones(to_explain.shape)
 	black_baseline = np.zeros(to_explain.shape)
+	# black_baseline1 = np.zeros(to_explain.shape)
+	median_baseline = np.ones(to_explain.shape)*0.5
 	random_baseline = np.random.rand(*to_explain.shape)
-	baseline = np.concatenate([white_baseline, black_baseline, random_baseline], axis = 0)
+	random_baseline1 = np.random.rand(*to_explain.shape)
+	baseline = np.concatenate([black_baseline, raw_image_baseline, random_baseline,random_baseline1, white_baselie,median_baseline], axis = 0)
+	# baseline = np.concatenate([itself_baseline, white_baselie, black_baseline, random_baseline], axis = 0)
+	# baseline = np.concatenate([white_baselie, black_baseline, random_baseline,black_baseline1], axis = 0)
 	trueImageInd = getTrueId(to_explain, model, device)
 	average_all_corners_broadcasted = get_neutral_background(to_explain[0])
 	normalized_baseline = normalize(baseline).to(device)
-	explainer = IGExplainer(model.to(device), normalized_baseline, local_smoothing = 0)
-
+	explainer = MyExplainer(model.to(device), normalized_baseline, local_smoothing = local_smoothing)
+	
+	#Get gradient from shapleyvalue
 	shap_values, indexes, baseline_samples, individual_grads = explainer.shap_values(
-			normalize(to_explain).to(device), ranked_outputs=1, nsamples = NSAMPLE, rseed = RSEED)
+		normalize(to_explain).to(device), ranked_outputs=1, nsamples = nsamples, rseed = rseed)
 	shap_values = [np.swapaxes(s, 0, -1) for s in shap_values]
-	raw_shap_value = np.sum(shap_values[0], axis = (0,-1))
+	raw_shap_value = np.sum(shap_values[0], axis = (0,-1)) #Raw shap values
 
 	return raw_shap_value, individual_grads
 
