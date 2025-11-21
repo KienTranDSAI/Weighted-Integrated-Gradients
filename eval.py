@@ -36,7 +36,7 @@ def get_ig_explanation(image_ind, img_paths, mask_paths, transform, model, devic
 	trueImageInd = getTrueId(to_explain, model, device)
 	average_all_corners_broadcasted = get_neutral_background(to_explain[0])
 	normalized_baseline = normalize(baseline).to(device)
-	explainer = MyExplainer(model.to(device), normalized_baseline, local_smoothing = local_smoothing)
+	explainer = IGExplainer(model.to(device), normalized_baseline, local_smoothing = local_smoothing)
 	
 	#Get gradient from shapleyvalue
 	shap_values, indexes, baseline_samples, individual_grads = explainer.shap_values(
