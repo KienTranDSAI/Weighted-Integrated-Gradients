@@ -16,7 +16,7 @@ torch.cuda.manual_seed_all(rseed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-def get_ig_explanation(img_path, mask_path, transform, model, device, local_smoothing = 0):
+def get_ig_explanation(image_ind, img_paths, mask_paths, transform, model, device, local_smoothing = 0):
 	shap_value_list = []
 	grad_list = []
 	local_smoothing = 0
@@ -26,7 +26,7 @@ def get_ig_explanation(img_path, mask_path, transform, model, device, local_smoo
 	black_baseline = np.zeros(to_explain.shape)
 	# black_baseline1 = np.zeros(to_explain.shape)
 	median_baseline = np.ones(to_explain.shape)*0.5
-	raw_image_baseline = np.array(get_sample_data(0)[1].permute(1,2,0).unsqueeze(0))
+	raw_image_baseline = np.array(get_sample_data(0, img_paths, mask_paths, transform)[1].permute(1,2,0).unsqueeze(0))
 	random_baseline = np.random.rand(*to_explain.shape)
 	random_baseline1 = np.random.rand(*to_explain.shape)
 	baseline = np.concatenate([black_baseline, raw_image_baseline, random_baseline,random_baseline1, white_baselie,median_baseline], axis = 0)
@@ -72,7 +72,7 @@ def eval(img_paths, mask_paths, transform, model, device, local_smoothing = 0):
 		baseline = np.zeros(to_explain.shape)
 		trueImageInd = getTrueId(to_explain, model.to('cpu'))
 		average_all_corners_broadcasted = get_neutral_background(to_explain[0])
-		raw_shap_value, individual_grads = get_ig_explanation(img_paths[image_ind], mask_paths[image_ind], transform, model, device)
+		raw_shap_value, individual_grads = get_ig_explanation(image_ind, img_paths, mask_paths, transform, model, device)
 		weight_list = []
 		score_list = []
 		for ind in range(len(individual_grads)):
