@@ -20,6 +20,7 @@ def get_ig_explanation(image_ind, img_paths, mask_paths, transform, model, devic
 	shap_value_list = []
 	grad_list = []
 	local_smoothing = 0
+	img_path, mask_path = img_paths[image_ind], mask_paths[image_ind]
 	transformed_image, transformed_mask = get_sample_image(img_path, transform), get_sample_mask(mask_path, transform)
 	to_explain = np.array(transformed_image.permute(1,2,0).unsqueeze(0))
 	white_baselie = np.ones(to_explain.shape)
