@@ -26,6 +26,7 @@ def get_ig_explanation(img_path, mask_path, transform, model, device, local_smoo
 	black_baseline = np.zeros(to_explain.shape)
 	# black_baseline1 = np.zeros(to_explain.shape)
 	median_baseline = np.ones(to_explain.shape)*0.5
+	raw_image_baseline = np.array(get_sample_data(0)[1].permute(1,2,0).unsqueeze(0))
 	random_baseline = np.random.rand(*to_explain.shape)
 	random_baseline1 = np.random.rand(*to_explain.shape)
 	baseline = np.concatenate([black_baseline, raw_image_baseline, random_baseline,random_baseline1, white_baselie,median_baseline], axis = 0)
