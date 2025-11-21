@@ -58,9 +58,10 @@ def eval(img_paths, mask_paths, transform, model, device, local_smoothing = 0):
 
 	for ind in range(NUM_IMAGES):
 		image_ind = image_indices[ind]
+		print(f"Image path: {img_paths[image_ind]}")
 		image_raw_name, transformed_image, transformed_mask = get_sample_data(image_ind, img_paths, mask_paths, transform)
 		to_explain = np.array(transformed_image.
-                        permute(1,2,0).unsqueeze(0))
+						permute(1,2,0).unsqueeze(0))
 		baseline = np.zeros(to_explain.shape)
 		trueImageInd = getTrueId(to_explain, model.to('cpu'))
 		average_all_corners_broadcasted = get_neutral_background(to_explain[0])
