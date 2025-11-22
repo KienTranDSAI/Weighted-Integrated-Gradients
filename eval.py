@@ -131,7 +131,8 @@ if __name__ == "__main__":
 		transforms.Resize((224, 224)),
 		transforms.ToTensor()
 	])
-	model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+	#model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+	model = models.mobilenet_v2(pretrained=True).eval()
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	# val, grads = get_ig_explanation(img_path, mask_path, transform, model, device)
 	# print(grad.shape)
