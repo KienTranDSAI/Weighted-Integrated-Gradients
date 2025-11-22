@@ -75,6 +75,8 @@ def eval(img_paths, mask_paths, transform, model, device, local_smoothing = 0):
 		trueImageInd = getTrueId(to_explain, model.to('cpu'))
 		average_all_corners_broadcasted = get_neutral_background(to_explain[0])
 		raw_shap_value, individual_grads = get_ig_explanation(image_ind, img_paths, mask_paths, transform, model, device)
+		print(f"shap sum: {raw_shap_value.sum()}, grad sum: {individual_grads[0].sum()}")
+
 		weight_list = []
 		score_list = []
 		for ind in range(len(individual_grads)):
