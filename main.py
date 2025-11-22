@@ -1,82 +1,172 @@
+"""Main script for generating saliency maps using Weighted Integrated Gradients."""
+
 import argparse
 import os
+import numpy as np
+import torch
+import matplotlib.pyplot as plt
+from torchvision import models, transforms
 
-from torchvision import models
-from torchvision import transforms
+from src.explainers import WGExplainer
+from src.utils import (
+    get_sample_image,
+    normalize,
+    get_neutral_background,
+    plot_saliency_with_topk,
+)
+from src.utils.model_utils import get_true_id
+from src.metrics import exact_find_d_alpha
+from src.config import set_random_seed, DEFAULT_RANDOM_SEED
 
-from explainer import WGExplainer
-from utils import *
 
-NSAMPLE = 3
-RSEED = 6
-torch.manual_seed(RSEED)
-np.random.seed(RSEED)
+# Configuration
+NUM_SAMPLES = 3
+RANDOM_SEED = 6
 
-def explain_img(img_path, transform, model, device, num_points=500, img_alpha=0.3, sali_alpha=0.6):
-	transformed_image = get_sample_image(img_path, transform)
-	to_explain = np.array(transformed_image.permute(1,2,0).unsqueeze(0))
+# Set random seed for reproducibility
+set_random_seed(RANDOM_SEED)
 
-	white_baseline = np.ones(to_explain.shape)
-	black_baseline = np.zeros(to_explain.shape)
-	random_baseline = np.random.rand(*to_explain.shape)
-	baseline = np.concatenate([white_baseline, black_baseline, random_baseline], axis = 0)
-	trueImageInd = getTrueId(to_explain, model, device)
-	average_all_corners_broadcasted = get_neutral_background(to_explain[0])
-	normalized_baseline = normalize(baseline).to(device)
-	explainer = WGExplainer(model.to(device), normalized_baseline, local_smoothing = 0)
 
-	shap_values, indexes, baseline_samples, individual_grads = explainer.shap_values(
-			normalize(to_explain).to(device), ranked_outputs=1, nsamples = NSAMPLE, rseed = RSEED)
-	shap_values = [np.swapaxes(s, 0, -1) for s in shap_values]
-	raw_shap_value = np.sum(shap_values[0], axis = (0,-1))
-	weight_list = []
-	for ind in range(len(individual_grads)):
-		individual_grad = np.abs(individual_grads[ind])
-		individual_val = np.sum(individual_grad, axis = 0)
-		num_of_deleted_point, score = exact_find_d_alpha(model, device, to_explain,individual_val,trueImageInd = trueImageInd, 
-														 target_ratio=0.5, neutral_val=average_all_corners_broadcasted, epsilon=0.005, max_iter=100)
-		weight_list.append(num_of_deleted_point)   
-	weight_list = np.array(weight_list)
-	weight_list = (50176/weight_list)/(50176/weight_list).sum()
-	weight_list = weight_list.reshape(-1,1,1,1)
-	weighted_basedline_shap_val = np.sum(weight_list * individual_grads, axis = (0,1))
-	fig, ax = plt.subplots(figsize=(4, 4))
-	ax = plot_saliency_with_topk(ax, weighted_basedline_shap_val, to_explain.squeeze().copy(), "Weighted Baseline SHAP", k=num_points, img_alpha=img_alpha, sali_alpha=sali_alpha)
-	return fig, ax
+def explain_image(
+    img_path: str,
+    transform,
+    model: torch.nn.Module,
+    device: str,
+    num_points: int = 500,
+    img_alpha: float = 0.3,
+    sali_alpha: float = 0.6
+) -> tuple:
+    """Generate weighted baseline explanation for an image.
+    
+    Args:
+        img_path: Path to input image
+        transform: Torchvision transform to apply
+        model: PyTorch model for inference
+        device: Device to run inference on
+        num_points: Number of top attribution points to display
+        img_alpha: Alpha transparency for original image
+        sali_alpha: Alpha transparency for saliency map
+        
+    Returns:
+        Tuple of (figure, axes) with the saliency visualization
+    """
+    # Load and prepare image
+    transformed_image = get_sample_image(img_path, transform)
+    to_explain = np.array(transformed_image.permute(1, 2, 0).unsqueeze(0))
+
+    # Create multiple baselines
+    white_baseline = np.ones(to_explain.shape)
+    black_baseline = np.zeros(to_explain.shape)
+    random_baseline = np.random.rand(*to_explain.shape)
+    baseline = np.concatenate([white_baseline, black_baseline, random_baseline], axis=0)
+    
+    # Get model prediction and neutral background
+    true_image_ind = get_true_id(to_explain, model, device)
+    average_all_corners_broadcasted = get_neutral_background(to_explain[0])
+    
+    # Normalize baseline and create explainer
+    normalized_baseline = normalize(baseline).to(device)
+    explainer = WGExplainer(model.to(device), normalized_baseline, local_smoothing=0)
+
+    # Compute SHAP values
+    shap_values, indexes, baseline_samples, individual_grads = explainer.shap_values(
+        normalize(to_explain).to(device),
+        ranked_outputs=1,
+        nsamples=NUM_SAMPLES,
+        rseed=RANDOM_SEED
+    )
+    
+    # Process SHAP values
+    shap_values = [np.swapaxes(s, 0, -1) for s in shap_values]
+    
+    # Compute weights for each baseline
+    weight_list = []
+    for ind in range(len(individual_grads)):
+        individual_grad = np.abs(individual_grads[ind])
+        individual_val = np.sum(individual_grad, axis=0)
+        
+        num_of_deleted_point, score = exact_find_d_alpha(
+            model,
+            device,
+            to_explain,
+            individual_val,
+            trueImageInd=true_image_ind,
+            target_ratio=0.5,
+            neutral_val=average_all_corners_broadcasted,
+            epsilon=0.005,
+            max_iter=100
+        )
+        weight_list.append(num_of_deleted_point)
+    
+    # Normalize weights (inverse relationship with deletion points)
+    weight_list = np.array(weight_list)
+    weight_list = (50176 / weight_list) / (50176 / weight_list).sum()
+    weight_list = weight_list.reshape(-1, 1, 1, 1)
+    
+    # Compute weighted baseline attribution
+    weighted_baseline_shap_val = np.sum(weight_list * individual_grads, axis=(0, 1))
+    
+    # Create visualization
+    fig, ax = plt.subplots(figsize=(4, 4))
+    ax = plot_saliency_with_topk(
+        ax,
+        weighted_baseline_shap_val,
+        to_explain.squeeze().copy(),
+        "Weighted Baseline SHAP",
+        k=num_points,
+        img_alpha=img_alpha,
+        sali_alpha=sali_alpha
+    )
+    
+    return fig, ax
+
 
 def main():
-	# Create argument parser
-	parser = argparse.ArgumentParser(description='Generate saliency map for an image')
-	parser.add_argument('--input', type=str, required=True, help='Path to input image')
-	parser.add_argument('--output', type=str, required=True, help='Output directory for saving results')
-	args = parser.parse_args()
+    """Main entry point for the script."""
+    # Create argument parser
+    parser = argparse.ArgumentParser(
+        description='Generate saliency map for an image using Weighted Integrated Gradients'
+    )
+    parser.add_argument('--input', type=str, required=True, help='Path to input image')
+    parser.add_argument('--output', type=str, required=True, help='Output directory for saving results')
+    parser.add_argument('--num-points', type=int, default=1000, help='Number of top points to display')
+    parser.add_argument('--img-alpha', type=float, default=0.75, help='Alpha for original image')
+    parser.add_argument('--sali-alpha', type=float, default=0.8, help='Alpha for saliency map')
+    args = parser.parse_args()
 
-	os.makedirs(args.output, exist_ok=True)
+    # Create output directory
+    os.makedirs(args.output, exist_ok=True)
 
-	transform = transforms.Compose([
-		transforms.Resize((224, 224)),
-		transforms.ToTensor()
-	])
+    # Setup transform and model
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor()
+    ])
 
-	DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-	model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
 
-	# Get filename without extension for saving
-	img_basename = os.path.splitext(os.path.basename(args.input))[0]
-	output_path = os.path.join(args.output, f"{img_basename}_explained.png")
+    # Get output path
+    img_basename = os.path.splitext(os.path.basename(args.input))[0]
+    output_path = os.path.join(args.output, f"{img_basename}_explained.png")
 
-	print(f"Processing image: {args.input}")
+    print(f"Processing image: {args.input}")
 
-	# Generate and save the saliency map
-	fig, ax = explain_img(args.input, transform, model, DEVICE, num_points=1000, img_alpha=0.75, sali_alpha=0.8)
+    # Generate and save the saliency map
+    fig, ax = explain_image(
+        args.input,
+        transform,
+        model,
+        device,
+        num_points=args.num_points,
+        img_alpha=args.img_alpha,
+        sali_alpha=args.sali_alpha
+    )
 
-	print(f"Saving result to: {output_path}")
-	fig.savefig(output_path)
+    print(f"Saving result to: {output_path}")
+    fig.savefig(output_path)
+    print("Done!")
 
-	print("Done!")
 
 if __name__ == '__main__':
-	main()
-
-
-
+    main()
