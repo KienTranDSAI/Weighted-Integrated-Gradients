@@ -230,7 +230,8 @@ def main():
     """Main entry point for the evaluation script."""
     # Setup dataset paths
     # For local dataset
-    dataset_dir = "./data"
+    # dataset_dir = "./data"
+    dataset_dir = "/kaggle/input/old-data/Adaptive"
     images_raw_names = [i for i in os.listdir(dataset_dir + "/Image")]
     img_paths = [dataset_dir + f"/Image/{name}" for name in images_raw_names]
     mask_paths = [dataset_dir + f"/Mask/{name}" for name in images_raw_names]
