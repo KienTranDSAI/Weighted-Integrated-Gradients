@@ -9,6 +9,7 @@ import random
 import torch
 import numpy as np
 rseed = 8
+nsamples = 6
 torch.manual_seed(rseed)
 np.random.seed(rseed)
 torch.cuda.manual_seed(rseed)
@@ -16,7 +17,7 @@ torch.cuda.manual_seed_all(rseed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark = False
 
-def get_ig_explanation(image_ind, img_paths, mask_paths, transform, model, device, local_smoothing = 0):
+def get_ig_explanation(image_ind, img_paths, mask_paths, transform, model, device, local_smoothing = 0, rseed = rseed, nsamples = nsamples):
 	shap_value_list = []
 	grad_list = []
 	local_smoothing = 0
