@@ -136,7 +136,7 @@ if __name__ == "__main__":
 		transforms.ToTensor()
 	])
 	#model = models.vgg16(weights=models.VGG16_Weights.DEFAULT)
-	model = models.mobilenet_v2(pretrained=True).eval()
+	model = models.vgg16(pretrained=True).eval()
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	
 	shap_deletion_score, weighted_baseline_deletion_score, filtered_weighted_baseline_deletion_score = eval(img_paths, mask_paths, transform, model, device)
