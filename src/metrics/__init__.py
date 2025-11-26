@@ -11,6 +11,11 @@ from .attribution_utils import (
     create_mask_from_indices,
     filter_weights,
 )
+from .overlap_metrics import (
+    get_raw_important_point,
+    create_shap_image,
+    get_auc_overlapping,
+)
 
 __all__ = [
     "exact_find_d_alpha",
@@ -20,5 +25,8 @@ __all__ = [
     "get_top_k",
     "create_mask_from_indices",
     "filter_weights",
+    "get_raw_important_point",
+    "create_shap_image",
+    "get_auc_overlapping",
 ]
 

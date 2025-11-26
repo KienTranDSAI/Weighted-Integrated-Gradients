@@ -16,7 +16,7 @@ from src.utils import (
     get_available_models,
 )
 from src.utils.model_utils import get_true_id
-from src.metrics import exact_find_d_alpha, get_auc_deletion, filter_weights
+from src.metrics import exact_find_d_alpha, get_auc_deletion, filter_weights, get_auc_overlapping
 from src.config import set_random_seed, DEFAULT_NUM_IMAGES, DEFAULT_THRESHOLD, DEFAULT_IMAGE_SIZE
 
 # Configuration
@@ -51,9 +51,11 @@ def evaluate(
         transform: Torchvision transform to apply
         model: PyTorch model for inference
         device: Device to run inference on
+        num_images: Number of images to evaluate
         
     Returns:
-        Tuple of (shap_deletion_scores, weighted_deletion_scores, filtered_deletion_scores)
+        Tuple of (shap_deletion_scores, weighted_deletion_scores, filtered_deletion_scores,
+                  shap_overlap_scores, weighted_overlap_scores, filtered_overlap_scores)
     """
     # Setup random seed and image indices
     total_images = len(img_paths)
@@ -115,6 +117,7 @@ def evaluate(
     
     # PHASE 2: Weighted Baseline Evaluation
     weighted_baseline_value_list = []
+    filtered_weighted_baseline_value_list = []
     shap_deletion_score = []
     weighted_baseline_deletion_score = []
     filtered_weighted_baseline_deletion_score = []
@@ -174,6 +177,7 @@ def evaluate(
             filtered_weight_list * individual_grads, axis=(0, 1)
         )
         weighted_baseline_value_list.append(weighted_baseline_shap_val)
+        filtered_weighted_baseline_value_list.append(filtered_weighted_baseline_shap_val)
         
         # PHASE 3: Compute deletion metrics
         raw_shap_value = shap_value_list[image_ind]
@@ -217,8 +221,43 @@ def evaluate(
         # print("Area under the curve of weighted baseline:", weighted_baseline_area_under_curve)
         # print("Area under the curve of filtered weighted baseline:", filtered_weighted_baseline_area_under_curve)
         # print("-" * 50)
+    
+    # PHASE 4: Compute overlap metrics with ground truth masks
+    percentile_array = np.arange(1, 101)
+    shap_overlap_score = []
+    weighted_baseline_overlap_score = []
+    filtered_weighted_baseline_overlap_score = []
+    
+    for image_ind in range(num_images):
+        random_ind = image_indices[image_ind]
+        image_raw_name, transformed_image, transformed_mask = get_sample_data(
+            random_ind, img_paths, mask_paths, transform
+        )
         
-    return shap_deletion_score, weighted_baseline_deletion_score, filtered_weighted_baseline_deletion_score
+        # Process mask
+        mask = np.array(transformed_mask.permute(1, 2, 0))
+        mask = mask[:, :, 0]
+        mask[mask != 0] = 1
+        segment_points = int(mask.sum())
+        
+        # Get attribution values
+        raw_shap_value = shap_value_list[image_ind]
+        weighted_baseline_shap_val = weighted_baseline_value_list[image_ind]
+        filtered_baseline_shap_val = filtered_weighted_baseline_value_list[image_ind]
+        
+        # Compute AUC overlap scores
+        shap_overlap_score.append(
+            get_auc_overlapping(percentile_array, raw_shap_value, mask, segment_points)
+        )
+        weighted_baseline_overlap_score.append(
+            get_auc_overlapping(percentile_array, weighted_baseline_shap_val, mask, segment_points)
+        )
+        filtered_weighted_baseline_overlap_score.append(
+            get_auc_overlapping(percentile_array, filtered_baseline_shap_val, mask, segment_points)
+        )
+        
+    return (shap_deletion_score, weighted_baseline_deletion_score, filtered_weighted_baseline_deletion_score,
+            shap_overlap_score, weighted_baseline_overlap_score, filtered_weighted_baseline_overlap_score)
 
 
 def main():
@@ -281,7 +320,8 @@ def main():
     model = load_model(args.model, device=None)
     
     # Run evaluation
-    shap_deletion_score, weighted_baseline_deletion_score, filtered_weighted_baseline_deletion_score = evaluate(
+    (shap_deletion_score, weighted_baseline_deletion_score, filtered_weighted_baseline_deletion_score,
+     shap_overlap_score, weighted_baseline_overlap_score, filtered_weighted_baseline_overlap_score) = evaluate(
         img_paths, mask_paths, transform, model, device, num_images_to_eval
     )
     
@@ -291,9 +331,15 @@ def main():
     print('=' * 50)
     print(f'Model: {args.model.upper()}')
     print('-' * 50)
-    print(f'Mean AUC of Deletion - EG :           {np.average(shap_deletion_score):.4f}')
+    print('DELETION METRICS (Lower is better):')
+    print(f'Mean AUC of Deletion - EG:            {np.average(shap_deletion_score):.4f}')
     print(f'Mean AUC of Deletion - WG:            {np.average(weighted_baseline_deletion_score):.4f}')
     print(f'Mean AUC of Deletion - Filtered WG:   {np.average(filtered_weighted_baseline_deletion_score):.4f}')
+    print('-' * 50)
+    print('OVERLAP METRICS (Higher is better):')
+    print(f'Mean AUC of Overlap - EG:             {np.average(shap_overlap_score):.4f}')
+    print(f'Mean AUC of Overlap - WG:             {np.average(weighted_baseline_overlap_score):.4f}')
+    print(f'Mean AUC of Overlap - Filtered WG:    {np.average(filtered_weighted_baseline_overlap_score):.4f}')
     print('=' * 50)
 
 
